@@ -16,8 +16,8 @@ def compareSchemas(df1: org.apache.spark.sql.DataFrame, df2: org.apache.spark.sq
  
   // set nullables to be true all around
   if (noNullable) {
-     StructType(schema1.map(_.copy())) == StructType(schema2.map(_.copy(nullable = true)))
-  } else schema1 == schema2nullable = true
+    StructType(schema1.map(_.copy(nullable = true))) == StructType(schema2.map(_.copy(nullable = true)))
+  } else schema1 == schema2
 }
 
 // COMMAND ----------
@@ -26,20 +26,32 @@ def compareDFs(df1: org.apache.spark.sql.DataFrame, df2: org.apache.spark.sql.Da
   // USAGE: compareDFs(dataFrame1, dataFrame2)
   // returns: Boolean value
   
-  // step 1: see if one or both DFs are empty
-  if (df1.head(1).isEmpty || df2.head(1).isEmpty) false
+  val df1Cnt = df1.count
+  val df2Cnt = df2.count
   
-  // step 2: check to see if schemas are equal using above 
-  else if (compareSchemas(df1, df2) == false) false
+  // compare schema
+  if (compareSchemas(df1, df2) == false) {
+    println("schemas are different")
+    false
+  }
   
-  // step 3: compare row counts
-  else if (df1.count != df2.count) false
-  
+  else if (df1Cnt == 0 | df2Cnt == 0) {
+    println(s"row count 1 is ${df1Cnt}; row count 2 is ${df2Cnt}")
+    df1Cnt == df2Cnt
+  }
+
+  // compare row counts
+  else if (df1Cnt != df2Cnt) {
+    println("row counts are different")
+    false
+  }
+
   else {
     // reverse order of index and contents 
     val rdd1 = df1.rdd.zipWithIndex.map(r => (r._2, r._1.get(0)))
     val rdd2 = df2.rdd.zipWithIndex.map(r => (r._2, r._1.get(0)))
 
+    //true
     /* reduce by key on the index i.e. r._1
        grab only the value (a boolean)
        then we have a list of booleans 
@@ -61,44 +73,19 @@ def compareDFs_fast(df1: org.apache.spark.sql.DataFrame, df2: org.apache.spark.s
   // USAGE: compareDFs(dataFrame1, dataFrame2)
   // returns: Boolean value
   
-  // step 1: see if one or both DFs are empty
-  if (df1.head(1).isEmpty || df2.head(1).isEmpty) false
-  
-  // step 2: check to see if schemas are equal using above 
-  else if (compareSchemas(df1, df2) == false) false
-  
+  // check to see if schemas are equal using above 
+  // else 
+  if (compareSchemas(df1, df2) == false) {
+    println("schemas are different")
+    false
+  }
   // step 3: compare row counts
-  else if (df1.count != df2.count) false
-  
+  else if (df1.count != df2.count) {
+    println("row counts are different")
+    false
+  }
+
   // verify that the symmetric difference between df1 and df2 is empty
   else
     ((df2.exceptAll(df1)).isEmpty) && ((df1.exceptAll(df2)).isEmpty)
 }
-
-// COMMAND ----------
-
-// MAGIC %scala
-// MAGIC /** Given a full path string and a flag indicating whether to list leaf subdirectory
-// MAGIC    *
-// MAGIC    *  @param filePath      : path string starting with s3://
-// MAGIC    *  @param subdirs   : list down to leaf subdirectory
-// MAGIC    *  @return sequence of leaf files or subdirectories
-// MAGIC    */
-// MAGIC def recursiveList(filePath: String, subdirs: Boolean = false): Seq[String] = {
-// MAGIC   val allFiles = ListBuffer.empty[String]
-// MAGIC
-// MAGIC   def recursiveListHelper(filePath: String, subdirs: Boolean = false): Seq[Any] = {
-// MAGIC     dbutils.fs.ls(filePath).map { fi =>
-// MAGIC         if (fi.isFile) allFiles.append(fi.path)
-// MAGIC         else recursiveListHelper(fi.path, subdirs)
-// MAGIC      }
-// MAGIC    }
-// MAGIC
-// MAGIC   recursiveListHelper(filePath, subdirs)
-// MAGIC
-// MAGIC   if (!subdirs) allFiles
-// MAGIC   else allFiles
-// MAGIC     .map(_.split("/")
-// MAGIC     .dropRight(1)
-// MAGIC     .mkString("/")).distinct
-// MAGIC   }
